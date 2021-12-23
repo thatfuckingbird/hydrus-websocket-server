@@ -26,6 +26,7 @@ from hydrus.client import ClientParsing
 from hydrus.client.importing import ClientImportFiles
 from hydrus.client.importing import ClientImporting
 from hydrus.client.importing.options import FileImportOptions
+from hydrus.client.importing.options import PresentationImportOptions
 from hydrus.client.importing.options import TagImportOptions
 from hydrus.client.metadata import ClientTags
 from hydrus.client.networking import ClientNetworkingDomain
@@ -95,10 +96,22 @@ class FileSeed( HydrusSerialisable.SerialisableBase ):
     
     def _AddPrimaryURLs( self, urls ):
         
+        if len( urls ) == 0:
+            
+            return
+            
+        
         urls = ClientNetworkingDomain.NormaliseAndFilterAssociableURLs( urls )
         
-        urls.discard( self.file_seed_data )
-        urls.discard( self._referral_url )
+        if self.file_seed_type == FILE_SEED_TYPE_URL:
+            
+            urls.discard( self.file_seed_data )
+            
+        
+        if self._referral_url is not None:
+            
+            urls.discard( self._referral_url )
+            
         
         self._primary_urls.update( urls )
         self._source_urls.difference_update( urls )
@@ -106,11 +119,37 @@ class FileSeed( HydrusSerialisable.SerialisableBase ):
     
     def _AddSourceURLs( self, urls ):
         
+        if len( urls ) == 0:
+            
+            return
+            
+        
         urls = ClientNetworkingDomain.NormaliseAndFilterAssociableURLs( urls )
         
-        urls.discard( self.file_seed_data )
-        urls.discard( self._referral_url )
+        if self.file_seed_type == FILE_SEED_TYPE_URL:
+            
+            urls.discard( self.file_seed_data )
+            
+        
+        if self._referral_url is not None:
+            
+            urls.discard( self._referral_url )
+            
+        
         urls.difference_update( self._primary_urls )
+        
+        primary_domains = set()
+        
+        if self.file_seed_type == FILE_SEED_TYPE_URL:
+            
+            primary_domains.add( ClientNetworkingDomain.ConvertURLIntoDomain( self.file_seed_data ) )
+            
+        
+        primary_domains.update( ( ClientNetworkingDomain.ConvertURLIntoDomain( primary_url ) for primary_url in self._primary_urls ) )
+        
+        # ok when a booru has a """"""source"""""" url that points to a file alternate on the same booru, that isn't what we call a source url
+        # so anything that has a source url with the same domain as our primaries, just some same-site loopback, we'll dump
+        urls = { url for url in urls if ClientNetworkingDomain.ConvertURLIntoDomain( url ) not in primary_domains }
         
         self._source_urls.update( urls )
         
@@ -1027,34 +1066,18 @@ class FileSeed( HydrusSerialisable.SerialisableBase ):
         self._UpdateModified()
         
     
-    def ShouldPresent( self, file_import_options: FileImportOptions.FileImportOptions, in_inbox = None ):
+    def ShouldPresent( self, presentation_import_options: PresentationImportOptions.PresentationImportOptions ):
         
-        hash = self.GetHash()
-        
-        if hash is not None and self.status in CC.SUCCESSFUL_IMPORT_STATES:
+        if not self.HasHash():
             
-            if in_inbox is None:
-                
-                if file_import_options.ShouldPresentIgnorantOfInbox( self.status ):
-                    
-                    return True
-                    
-                
-                if file_import_options.ShouldNotPresentIgnorantOfInbox( self.status ):
-                    
-                    return False
-                    
-                
-                in_inbox = hash in HG.client_controller.Read( 'inbox_hashes', ( hash, ) )
-                
-            
-            if file_import_options.ShouldPresent( self.status, in_inbox ):
-                
-                return True
-                
+            return False
             
         
-        return False
+        was_just_imported = not HydrusData.TimeHasPassed( self.modified + 5 )
+        
+        should_check_location = not was_just_imported
+        
+        return presentation_import_options.ShouldPresentHashAndStatus( self.GetHash(), self.status, should_check_location = should_check_location )
         
     
     def WorksInNewSystem( self ):
@@ -1368,6 +1391,14 @@ class FileSeed( HydrusSerialisable.SerialisableBase ):
         except HydrusExceptions.ShutdownException:
             
             return False
+            
+        except HydrusExceptions.UnsupportedFileException as e:
+            
+            status = CC.STATUS_ERROR
+            
+            note = str( e )
+            
+            self.SetStatus( status, note = note )
             
         except HydrusExceptions.VetoException as e:
             
@@ -2489,7 +2520,7 @@ class FileSeedCache( HydrusSerialisable.SerialisableBase ):
         return latest_timestamp
         
     
-    def GetNextFileSeed( self, status: int ):
+    def GetNextFileSeed( self, status: int ) -> typing.Optional[ FileSeed ]:
         
         with self._lock:
             
@@ -2517,46 +2548,14 @@ class FileSeedCache( HydrusSerialisable.SerialisableBase ):
         return num_files
         
     
-    def GetPresentedHashes( self, file_import_options: FileImportOptions.FileImportOptions ):
+    def GetPresentedHashes( self, presentation_import_options: PresentationImportOptions.PresentationImportOptions ):
         
         with self._lock:
             
-            eligible_file_seeds = [ file_seed for file_seed in self._file_seeds if file_seed.HasHash() ]
+            hashes_and_statuses = [ ( file_seed.GetHash(), file_seed.status ) for file_seed in self._file_seeds if file_seed.HasHash() ]
             
         
-        file_seed_hashes = [ file_seed.GetHash() for file_seed in eligible_file_seeds ]
-        
-        if len( file_seed_hashes ) > 0:
-            
-            inbox_hashes = HG.client_controller.Read( 'inbox_hashes', file_seed_hashes )
-            
-        else:
-            
-            inbox_hashes = set()
-            
-        
-        hashes = []
-        hashes_seen = set()
-        
-        for file_seed in eligible_file_seeds:
-            
-            hash = file_seed.GetHash()
-            
-            if hash in hashes_seen:
-                
-                continue
-                
-            
-            in_inbox = hash in inbox_hashes
-            
-            if file_seed.ShouldPresent( file_import_options, in_inbox = in_inbox ):
-                
-                hashes.append( hash )
-                hashes_seen.add( hash )
-                
-            
-        
-        return hashes
+        return presentation_import_options.GetPresentedHashes( hashes_and_statuses )
         
     
     def GetStatus( self ):
