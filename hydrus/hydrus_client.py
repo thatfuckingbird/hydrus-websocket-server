@@ -41,8 +41,14 @@ try:
     argparser.add_argument( '--boot_debug', action='store_true', help = 'print additional bootup information to the log' )
     argparser.add_argument( '--no_wal', action='store_true', help = 'OBSOLETE: run using TRUNCATE db journaling' )
     argparser.add_argument( '--db_memory_journaling', action='store_true', help = 'OBSOLETE: run using MEMORY db journaling (DANGEROUS)' )
+    argparser.add_argument( '--address', metavar='addr', type=str, default="", help='websocket api listening address' )
+    argparser.add_argument( '--port', metavar='num', type=int, default=47341, help='websocket api listening port' )
+    argparser.add_argument( '--certfile', metavar='file', type=str, default=None, help='websocket api SSL cert file' )
+    argparser.add_argument( '--keyfile', metavar='file', type=str, default=None, help='websocket api SSL key file' )
+    argparser.add_argument( '--access-key', metavar='key', type=str, default=None, help='websocket api access key' )
     
     result = argparser.parse_args()
+    HG.args = result
     
     if result.db_dir is None:
         

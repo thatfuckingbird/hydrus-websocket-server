@@ -39,7 +39,8 @@ def cbor_encoder(encoder, value):
 
 async def main():
     async with websockets.connect("ws://localhost:47341") as websocket:
-        await websocket.send(cbor2.dumps(['file_query_ids', search_context], default=cbor_encoder))
+        #await websocket.send(cbor2.dumps(['file_query_ids', search_context], default=cbor_encoder))
+        await websocket.send(cbor2.dumps(['version'], default=cbor_encoder))
         reply = await websocket.recv()
         print(cbor2.loads(reply))
 

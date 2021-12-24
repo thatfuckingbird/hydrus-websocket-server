@@ -6,10 +6,13 @@ import sys
 import threading
 import time
 import traceback
+import asyncio
 
 from qtpy import QtCore as QC
 from qtpy import QtWidgets as QW
 from qtpy import QtGui as QG
+
+from hydrus import wsapi
 
 from hydrus.core import HydrusConstants as HC
 from hydrus.core import HydrusController
@@ -2079,6 +2082,9 @@ class Controller( HydrusController.HydrusController ):
             self.InitModel()
             
             self.InitView()
+            
+            wsapi_thread = threading.Thread(target=asyncio.run, args=(wsapi.websocket_main(HG.args),), daemon=True)
+            wsapi_thread.start()
             
             self._is_booted = True
             
