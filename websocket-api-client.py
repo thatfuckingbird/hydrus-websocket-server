@@ -1,14 +1,15 @@
-# A basic example client
+# A basic example client + tests
 
 import cbor2
 import websockets
 import asyncio
 
+from . import schemas
+
 # Need the code below for now for the Predicate data structure and CBOR encoding
 # Won't be needed in the future when it's generated from schema
 from hydrus.client import ClientSearch
-from hydrus.client import ClientConstants as CC
-from hydrus.core import HydrusGlobals as HG
+
 class EmptyObject(object):
     pass
 HG.client_controller = EmptyObject()

@@ -1,0 +1,106 @@
+ ClientLocation.LocationContext.STATICCreateSimple( CC.COMBINED_LOCAL_FILE_SERVICE_KEY )
+        elif action == 'media_results_from_ids': result = self._GetMediaResults( *args, **kwargs )
+
+            def _GetMediaResultsFromHashes( self, hashes: typing.Iterable[ bytes ], sorted: bytes = False ) -> typing.List[ ClientMediaResult.MediaResult ]:
+    def __init__( self, names_to_notes: typing.Dict[ str, str ] ):
+        self._names_to_notes = names_to_notes
+
+                elif action == 'file_duplicate_hashes': result = self.modules_files_duplicates.DuplicatesGetFileHashesByDuplicateType( *args, **kwargs )
+ def DuplicatesGetFileHashesByDuplicateType( self, location_context: ClientLocation.LocationContext, hash, duplicate_type, allowed_hash_ids = None, preferred_hash_ids = None ):
+        
+        hash_id = self.modules_hashes_local_cache.GetHashId( hash )
+        
+        db_location_context = self.modules_files_storage.GetDBLocationContext( location_context )
+        
+        dupe_hash_ids = set()
+        
+        if duplicate_type == HC.DUPLICATE_FALSE_POSITIVE:
+            
+            
+                  
+      
+        elif action == 'file_duplicate_info': result = self.modules_files_duplicates.DuplicatesGetFileDuplicateInfo( *args, **kwargs )
+            def DuplicatesGetFileDuplicateInfo( self, location_context, hash ):
+        
+        
+
+        
+
+        elif action == 'dissolve_alternates_group': self.modules_files_duplicates.DuplicatesDissolveAlternatesGroupIdFromHashes( *args, **kwargs )
+    def DuplicatesDissolveAlternatesGroupIdFromHashes( self, hashes ):
+        hash_ids = self.modules_hashes_local_cache.GetHashIds( hashes )
+        
+        
+        
+                elif action == 'remove_alternates_member': self.modules_files_duplicates.DuplicatesRemoveAlternateMemberFromHashes( *args, **kwargs )
+    def DuplicatesRemoveAlternateMemberFromHashes( self, hashes ):
+        hash_ids = self.modules_hashes_local_cache.GetHashIds( hashes )
+
+
+
+/////////////////////////////////////////////
+elif action == 'duplicate_pair_status': self._DuplicatesSetDuplicatePairStatus( *args, **kwargs )
+    def _DuplicatesSetDuplicatePairStatus( self, pair_info ):
+        
+        for ( duplicate_type, hash_a, hash_b, service_keys_to_content_updates ) in pair_info:
+
+        duplicate_type == HC.DUPLICATE_ALTERNATE:
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        elif action == 'content_updates': self._ProcessContentUpdates( *args, **kwargs )
+        
+                        def _ProcessContentUpdates( self, service_keys_to_content_updates, publish_content_updates = True ):
+        
+        for ( service_key, content_updates ) in service_keys_to_content_updates.items():
+            for content_update in content_updates:
+                
+                ( data_type, action, row ) = content_update.ToTuple()
+        
+        elif service_type == HC.LOCAL_NOTES:
+                    
+                    if action == HC.CONTENT_UPDATE_SET:
+                        
+                        ( hash, name, note ) = row
+                        
+                        hash_id = self.modules_hashes_local_cache.GetHashId( hash )
+                        name_id = self.modules_texts.GetLabelId( name )
+                        
+                        self._Execute( 'DELETE FROM file_notes WHERE hash_id = ? AND name_id = ?;', ( hash_id, name_id ) )
+                        
+                        if len( note ) > 0:
+                            
+                            note_id = self.modules_texts.GetNoteId( note )
+                            
+                            self._Execute( 'INSERT OR IGNORE INTO file_notes ( hash_id, name_id, note_id ) VALUES ( ?, ?, ? );', ( hash_id, name_id, note_id ) )
+                            
+                        
+                    elif action == HC.CONTENT_UPDATE_DELETE:
+                        
+                        ( hash, name ) = row
+                        
+                        hash_id = self.modules_hashes_local_cache.GetHashId( hash )
+                        name_id = self.modules_texts.GetLabelId( name )
+                        
+                        self._Execute( 'DELETE FROM file_notes WHERE hash_id = ? AND name_id = ?;', ( hash_id, name_id ) )
+                        
+                              hash = media.GetHash()
+            
+            ( names_to_notes, deletee_names ) = panel.GetValue()
+            
+            content_updates = [ HydrusData.ContentUpdate( HC.CONTENT_TYPE_NOTES, HC.CONTENT_UPDATE_SET, ( hash, name, note ) ) for ( name, note ) in names_to_notes.items() ]
+            content_updates.extend( [ HydrusData.ContentUpdate( HC.CONTENT_TYPE_NOTES, HC.CONTENT_UPDATE_DELETE, ( hash, name ) ) for name in deletee_names ] )
+            
+            service_keys_to_content_updates = { CC.LOCAL_NOTES_SERVICE_KEY : content_updates }
+            
+            HG.client_controller.Write( 'content_updates', service_keys_to_content_updates )
+            
+        
